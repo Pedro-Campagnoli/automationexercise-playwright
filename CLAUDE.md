@@ -10,22 +10,24 @@ Playwright end-to-end tests against the public practice site **automationexercis
 
 ## Commands
 
+This project uses **pnpm** — `pnpm-lock.yaml` is the only lockfile and CI runs `pnpm install --frozen-lockfile`. Don't reintroduce `package-lock.json`.
+
 ```bash
-npm test                      # playwright test --ui  (UI mode, NOT headless)
-npm run debug                 # playwright test --debug
-npx playwright test           # headless run (what CI does)
-npx playwright test --headed
-npx playwright test tests/specs/test-cases.spec.ts
-npx playwright test -g "Test Case 1"   # single test by title
-npx playwright show-report
-npx playwright install --with-deps      # first-time browser install
+pnpm test                     # playwright test --ui  (UI mode, NOT headless)
+pnpm debug                    # playwright test --debug
+pnpm exec playwright test     # headless run (what CI does)
+pnpm exec playwright test --headed
+pnpm exec playwright test tests/specs/test-cases.spec.ts
+pnpm exec playwright test -g "Test Case 1"   # single test by title
+pnpm exec playwright show-report
+pnpm exec playwright install --with-deps      # first-time browser install
 ```
 
 Only the `chromium` project is enabled; firefox/webkit are commented out in the config. `retries: 2` applies locally as well as on CI, so a flaky failure will silently pass on retry — check the HTML report for retried attempts.
 
 TypeScript is **not** a dependency, so there is no typecheck step and Playwright transpiles without checking types. Type errors surface only in the editor, never as a failing run — don't take a green suite as evidence the types line up.
 
-Note: both `package-lock.json` and `pnpm-lock.yaml` are present. CI (`.github/workflows/playwright.yml`) uses `npm ci`, so keep `package-lock.json` in sync when changing dependencies.
+CI (`.github/workflows/playwright.yml`) injects `BASE_URL` itself — the repository variable `BASE_URL` if set, otherwise `https://automationexercise.com` — because `.env` is not versioned.
 
 ## Architecture
 
@@ -65,20 +67,26 @@ Assertions live in the page objects, not in the spec; the spec reads as a linear
 
 `expectHeader()` asserts the URL is `/`, so it belongs to the page you are actually on: call it *before* `menuClick(MenuLinks.SIGNUP_LOGIN)`, then `loginPage.expectLoginForm()` after. Calling it post-navigation asserts `/` while the browser sits on `/login`.
 
-Header navigation goes through the `MenuLinks` enum (`tests/enum/menu-links.enum.ts`) — `menuClick` takes `MenuLinks`, not a string, so a typo is a compile error rather than a locator timeout.
+Header navigation goes through the `MenuLinks` enum (`tests/enums/menu-links.enum.ts`) — `menuClick` takes `MenuLinks`, not a string, so a typo is a compile error rather than a locator timeout.
 
 ### Test data
 
-`utils/user.factory.ts` — `createUser()` returns a user whose `name`/`email` are salted with `Date.now()`, so each run registers a fresh account.
+`tests/utils/user.factory.ts` — `createUser(): UserType` builds a fully random user with `@faker-js/faker`. It declares no types of its own: `UserType` comes from `tests/types/user.type.ts`, `Titles`/`Country` from `tests/enums/`.
 
 Call `createUser()` **inside each test**, not at module scope, so every test owns an account nobody else deletes.
 
 Case 3 leans on the factory for a different reason: a freshly generated email has never been registered, which is exactly the precondition "login with incorrect credentials" needs.
 
-Two known warts here, both invisible at runtime because nothing typechecks:
+Faker output is deliberately constrained where the site or the assertions can't take arbitrary values — keep these in mind before loosening any of them:
 
-- The factory declares its own `UserDataProps` interface and a local `Titles` enum, duplicating `tests/types/user.type.ts`. Enums are nominal in TypeScript, so the local `Titles` is not assignable to `UserType['title']` — new code should import `UserType`/`Titles`/`Country` from `tests/types/user.type.ts`.
-- `Date.now()` alone is only unique per millisecond. With `fullyParallel: true`, workers can start inside the same millisecond and collide on one email; add a random suffix if that shows up as a flake.
+- **`country` must come from the `Country` enum.** The site's `#country` select has exactly 7 options, and `selectOption` fails on anything else — never `faker.location.country()`.
+- **`name` is a single first name, no space.** `checkLoggedIn` asserts `Logged in as <name>` with `exact: true`.
+- **`zipcode` / `mobile` are pure digits.** `faker.location.zipCode()` and `faker.phone.number()` can emit letters, hyphens or extensions.
+- **`password` is alphanumeric only**, so nothing depends on how the site or the form-encoded API handles special characters.
+- **`day` maxes out at 28** so the generated birth date always exists; `day`/`month`/`year` are strings because the selects match on numeric `value`.
+- **`email` still carries a `Date.now()` + random suffix.** Faker alone repeats values, and a collision on this shared site means one test deletes another's account.
+
+Faker means every run exercises different data (country, title, newsletter/offers checkboxes), so a failure may not reproduce on the next run. Grab the concrete values from the HTML report or `test-results/<test>/error-context.md` before re-running.
 
 ### A trap this site sets
 
@@ -86,6 +94,21 @@ Two known warts here, both invisible at runtime because nothing typechecks:
 
 ### Conventions
 
+Everything lives under `tests/`, one folder per layer:
+
+```
+tests/
+├── api/      AccountApi + barrel
+├── enums/    site vocabulary: MenuLinks, Titles, Country (one enum per file)
+├── pages/    *.page.ts + barrel
+├── specs/    *.spec.ts  <- testDir points here
+├── types/    pure shapes only (UserType)
+├── utils/    user.factory.ts
+└── fixtures.ts
+```
+
+- `testDir` is `./tests/specs`, not `./tests` — the rest of `tests/` is support code, so pointing it at the whole tree only worked because the default `testMatch` filtered it. Note this makes report paths relative to `tests/specs/`.
+- **Enums vs types**: `enums/` holds constraints the site imposes (the 7 `#country` options, the header link labels); `types/` holds data shapes. An enum does not belong in `types/user.type.ts`.
+- Barrels exist for `pages/` and `api/` because `fixtures.ts` consumes those two. The other folders have none on purpose.
 - `#id` locators scoped to a form container for the signup/register form; role-based locators (`getByRole('link', { name })`) for navigation and headings.
 - Comments in the page objects are in Portuguese; the user is a pt-BR speaker. Match the surrounding language when editing a file that already has them.
-- Everything lives under `tests/` but only `*.spec.ts` is collected — Playwright's default `testMatch` ignores the page objects, fixtures, api and enums.
