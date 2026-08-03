@@ -1,3 +1,5 @@
+import { Country } from "../tests/types/user.type";
+
 export interface UserDataProps {
   name: string;
   email: string;
@@ -42,7 +44,7 @@ export function createUser() {
     company: 'Grupo DBM',
     address: 'Rua Teste',
     address2: 'Complemento',
-    country: 'United States',
+    country: Country.INDIA,
     state: 'Paraná',
     city: 'Cianorte',
     zipcode: '87255000',
