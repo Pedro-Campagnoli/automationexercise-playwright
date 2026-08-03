@@ -1,4 +1,4 @@
-import { Country } from "../tests/types/user.type";
+import { Country } from "../enums/country.enum";
 
 export interface UserDataProps {
   name: string;

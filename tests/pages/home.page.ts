@@ -1,5 +1,5 @@
 import { expect, type Locator, type Page } from "@playwright/test";
-import { MenuLinks } from "../enum/menu-links.enum";
+import { MenuLinks } from "../enums/menu-links.enum";
 
 export class HomePage {
   protected readonly path = "/";

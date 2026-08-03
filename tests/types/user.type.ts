@@ -1,3 +1,5 @@
+import { Country } from "../enums/country.enum";
+import { Titles } from "../enums/titles.enum";
 
 export type UserType = {
   name: string;
@@ -20,18 +22,3 @@ export type UserType = {
   zipcode: string;
   mobile: string;
 };
-
-export enum Titles {
-  MR = 'Mr.',
-  MRS = 'Mrs.',
-}
-
-export enum Country {
-  INDIA = 'India',
-  UNITED_STATES = 'United States',
-  CANADA = 'Canada',
-  AUSTRALIA = 'Australia',
-  ISRAEL = 'Israel',
-  NEW_ZEALAND = 'New Zealand',
-  SINGAPORE = 'Singapore',
-}

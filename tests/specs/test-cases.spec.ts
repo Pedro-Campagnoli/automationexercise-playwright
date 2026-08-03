@@ -1,5 +1,5 @@
-import { createUser } from "../../utils/user.factory";
-import { MenuLinks } from "../enum/menu-links.enum";
+import { createUser } from "../utils/user.factory";
+import { MenuLinks } from "../enums/menu-links.enum";
 import { test } from "../fixtures";
 
 test('Test Case 1: Register User', async ({ homePage, loginPage, signupPage, accountCreatedPage, accountDeletedPage }) => {
