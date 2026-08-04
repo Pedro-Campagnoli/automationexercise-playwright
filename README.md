@@ -31,7 +31,7 @@ Escrita em **Playwright + TypeScript**, com Page Objects, fixtures customizadas,
 | Ferramenta | Papel |
 |---|---|
 | [Playwright](https://playwright.dev) | Runner, asserções e automação do browser |
-| TypeScript | Linguagem dos testes |
+| TypeScript | Linguagem dos testes, com verificação de tipos em `strict` via `tsconfig.json` |
 | [Faker](https://fakerjs.dev) | Geração de massa de dados aleatória |
 | dotenv | Carrega a URL base a partir do `.env` |
 | pnpm | Gerenciador de pacotes |
@@ -69,7 +69,10 @@ pnpm debug                           # abre o Inspector, passo a passo
 pnpm exec playwright test            # execução headless — é o que o CI faz
 pnpm exec playwright test --headed   # headless desligado, browser visível
 pnpm exec playwright show-report     # abre o último relatório HTML
+pnpm typecheck                       # tsc --noEmit — checagem de tipos, sem rodar teste
 ```
+
+> O Playwright transpila sem checar tipos, então **a suíte e o typecheck são verificações separadas**: uma execução verde não diz nada sobre os tipos. O CI roda os dois.
 
 Rodando um subconjunto:
 
@@ -240,7 +243,9 @@ E lembre que `retries: 2` também vale localmente: um teste intermitente pode ap
 
 ## CI
 
-`.github/workflows/playwright.yml` roda a suíte a cada push e pull request em `main`/`master`, com `pnpm install --frozen-lockfile` + `pnpm exec playwright test`, e publica o relatório HTML como artefato (retenção de 30 dias).
+`.github/workflows/playwright.yml` roda a cada push e pull request em `main`/`master`: `pnpm install --frozen-lockfile` → `pnpm typecheck` → `pnpm exec playwright test`, publicando o relatório HTML como artefato (retenção de 30 dias).
+
+O typecheck vem **antes** de instalar os browsers: erro de tipo derruba o build em segundos, sem gastar o download do Chromium nem uma rodada contra o site.
 
 No CI, `workers: 1` (execução serial) e `forbidOnly: true` — um `test.only` esquecido derruba o build.
 
@@ -252,6 +257,6 @@ Como o `.env` não é versionado, o workflow injeta a `BASE_URL` por conta próp
 
 - **5 de 26 casos** oficiais implementados, todos do fluxo de conta.
 - **Só `chromium`** está habilitado; Firefox e WebKit estão comentados no `playwright.config.ts`.
-- **Sem verificação de tipos.** TypeScript não é dependência do projeto, e o Playwright transpila sem checar tipos — erro de tipo só aparece no editor, nunca como falha de execução. Uma suíte verde não é evidência de que os tipos batem.
+- **Tipos são checados por um passo à parte.** `pnpm typecheck` (`strict`, mais `noUncheckedIndexedAccess` e `noImplicitReturns`) roda no CI e cobre os 16 arquivos do projeto, mas o Playwright continua transpilando sem checar nada — rodar só a suíte não valida tipagem. Vale conferir também se o editor está usando o TypeScript do `node_modules` e não a versão embutida nele, senão editor e CI podem discordar.
 - **`retries: 2` vale localmente**, o que pode mascarar instabilidade durante o desenvolvimento.
 - **Caso 4 não valida a navegação para a página de login.** O caso oficial pede essa verificação após o logout; hoje o teste só confere o estado do header.

@@ -25,7 +25,7 @@ pnpm exec playwright install --with-deps      # first-time browser install
 
 Only the `chromium` project is enabled; firefox/webkit are commented out in the config. `retries: 2` applies locally as well as on CI, so a flaky failure will silently pass on retry — check the HTML report for retried attempts.
 
-TypeScript is **not** a dependency, so there is no typecheck step and Playwright transpiles without checking types. Type errors surface only in the editor, never as a failing run — don't take a green suite as evidence the types line up.
+Types are checked by a **separate** step: `pnpm typecheck` (`tsc --noEmit`, driven by `tsconfig.json` — `strict`, plus `noUncheckedIndexedAccess` and `noImplicitReturns`), which CI runs before installing browsers. Playwright itself still transpiles without checking types, so a green suite is not evidence the types line up — run the typecheck too.
 
 CI (`.github/workflows/playwright.yml`) injects `BASE_URL` itself — the repository variable `BASE_URL` if set, otherwise `https://automationexercise.com` — because `.env` is not versioned.
 
